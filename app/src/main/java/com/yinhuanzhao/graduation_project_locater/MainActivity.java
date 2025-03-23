@@ -18,15 +18,17 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.yinhuanzhao.graduation_project_locater.fingerprint.FingerprintManager;
+import com.yinhuanzhao.graduation_project_locater.weibull.BayesianWeibullAlgorithm;
+
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
-
     private WifiManager wifiManager;
     private BroadcastReceiver wifiScanReceiver;
     private TextView txtPosition;
     private FingerprintManager fingerprintManager;
-    private WKNNAlgorithm wknnAlgorithm;
+    private BayesianWeibullAlgorithm bayesianWeibullAlgorithm;
     private final int LOCATION_PERMISSION_REQUEST_CODE = 1;
 
     @Override
@@ -38,17 +40,18 @@ public class MainActivity extends AppCompatActivity {
         txtPosition = findViewById(R.id.txtPosition);
         Button btnScan = findViewById(R.id.btnScan);
 
-        // 初始化 WifiManager
+        // 初始化 Wi-Fi 服务
         wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         if (wifiManager == null) {
-            Toast.makeText(this, "WiFi 服务不可用", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Wi-Fi 服务不可用", Toast.LENGTH_SHORT).show();
             return;
         }
         if (!wifiManager.isWifiEnabled()) {
+            Toast.makeText(this, "Wi-Fi 未开启，正在开启...", Toast.LENGTH_SHORT).show();
             wifiManager.setWifiEnabled(true);
         }
 
-        // 权限检查（ACCESS_FINE_LOCATION 为必须权限）
+        // 检查定位权限
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
@@ -56,36 +59,37 @@ public class MainActivity extends AppCompatActivity {
                     LOCATION_PERMISSION_REQUEST_CODE);
         }
 
-        // 初始化指纹库加载器和 WKNN 算法（这里以 k = 3 为例）
+        // 初始化指纹库管理器和定位算法
         fingerprintManager = new FingerprintManager(this);
-        wknnAlgorithm = new WKNNAlgorithm(3);
+        bayesianWeibullAlgorithm = new BayesianWeibullAlgorithm();
 
-        // 创建广播接收器：接收扫描结果后调用 WKNN 算法
+        // 创建广播接收器，接收扫描结果后调用定位算法
         wifiScanReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 boolean success = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false);
                 if (success) {
-                    // 使用 MainActivity.this 进行权限检查
-                    if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    // 再次检查定位权限
+                    if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION)
+                            != PackageManager.PERMISSION_GRANTED) {
                         return;
                     }
                     List<ScanResult> results = wifiManager.getScanResults();
-                    // 调用定位算法，返回估计的 ref_point（或映射到实际坐标）
-                    int estimatedRefPoint = wknnAlgorithm.estimatePosition(results, fingerprintManager.getFingerprintLibrary());
-                    txtPosition.setText("估计位置 (参考点): " + estimatedRefPoint);
+                    // 使用 BayesianWeibullAlgorithm 估计位置（参考点）
+                    int estimatedRefPoint = bayesianWeibullAlgorithm.estimatePosition(
+                            results, fingerprintManager.getFingerprintLibrary());
+                    txtPosition.setText("估计位置（参考点）: " + estimatedRefPoint);
                 } else {
-                    Toast.makeText(MainActivity.this, "WiFi 扫描失败", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "Wi-Fi 扫描失败", Toast.LENGTH_SHORT).show();
                 }
             }
         };
 
-
-        // 注册广播
+        // 注册广播接收器
         IntentFilter filter = new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
         registerReceiver(wifiScanReceiver, filter);
 
-        // 按钮点击事件：启动 WiFi 扫描
+        // 按钮点击事件：启动 Wi-Fi 扫描
         btnScan.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

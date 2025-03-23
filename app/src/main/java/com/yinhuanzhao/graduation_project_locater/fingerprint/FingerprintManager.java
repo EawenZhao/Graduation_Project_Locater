@@ -1,10 +1,9 @@
-package com.yinhuanzhao.graduation_project_locater;
-
+package com.yinhuanzhao.graduation_project_locater.fingerprint;
 
 import android.content.Context;
 
-import com.google.firebase.crashlytics.buildtools.reloc.com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,6 +28,7 @@ public class FingerprintManager {
             is.read(buffer);
             is.close();
             String json = new String(buffer, StandardCharsets.UTF_8);
+
             Gson gson = new Gson();
             Type listType = new TypeToken<List<FingerprintRecord>>() {}.getType();
             fingerprintLibrary = gson.fromJson(json, listType);
